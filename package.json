@@ -15,6 +15,9 @@
   ],
   "author": "Joel Rodrigues Moreira",
   "license": "ISC",
+  "dependencies": {
+    "validator": "^4.4.0"
+  },
   "bugs": {
     "url": "https://github.com/joeldatabox/zumbijs/issues"
   },
