@@ -1,250 +1,156 @@
-var NotFoundException = require('../ponto-service/exception/notFoundException');
-var InternalErrorException = require('../ponto-service/exception/internalErrorException');
-var BadRequestException = require('../ponto-service/exception/badRequestException');
-var Exception = require('../ponto-service/exception/exception');
-var validator = require('validator');
-var extend = require('util')._extend;
-
-var Zumbi = function (request, response, model) {
-    var res = response;
-    var req = request;
-    /**
-     * Trata resposta necessaria relacionada ao evento de busca de um recurso pelo ID
-     * @param key -> chave para retorno do json
-     * @param modelConstructor -> callback para construir o model
-     */
-    this.dispatchFindById = function (key) {
-        model.findById(req.params.id, function (error, value) {
-            if (error) {
-                processExceptions(new NotFoundException(), res);
-            } else if (value) {
-                dispatcher(200, createJson(key, value), res);
-            } else {
-                dispatcher(404, null, res);
-            }
-        });
-    };
-    /**
-     * Trata resposta necessaria relacionada ao evento de busca de um recurso
-     * @param key -> chave para retorno do json
-     * @param modelConstructor -> callback para construir o model
-     */
-    this.dispatchFind = function (key) {
-        this.dispatchFindByField(undefined, key);
-    };
-
-    /**
-     * Trata resposta necessaria relacionada ao envento de busca de um recurso filtrando um campo
-     * @param fieldFilter -> campo a ser filtrado
-     * @param key -> chave para retorno no json
-     */
-    this.dispatchFindByField = function (fieldFilter, key) {
-        var parameter = {};
-        fieldFilter ? parameter = extend(fieldFilter, req.query) : parameter = req.query;
-        filterEngine(model.find(), validate(parameter), function (query) {
-            query.exec(function (error, values) {
-                if (error) {
-                    processExceptions(new NotFoundException(), res);
-                } else if (values) {
-                    dispatcher(200, createJson(key, values), res);
-                } else {
-                    dispatcher(404, null, res);
-                }
-            });
-        });
-    };
-    /**
-     * Sava um intem no banco e dispacha o mesmo
-     * @param modelConstructor -> function que constroem um objeto do tipo esperado
-     */
-    this.dispatchSave = function () {
-        if (Object.keys(req.body).length === 0) {
-            processExceptions(new BadRequestException(), res);
-        } else {
-            //deletando o campo _id para evitar erro de inconsistencia
-            delete req.body._id;
-            model = new model(validate(req.body));
-            model.save(function (error, valueSaved) {
-                if (error) {
-                    processExceptions(new Exception(error), res);
-                } else {
-                    //setando location no header do response
-                    setLocation(req, res, valueSaved);
-                    dispatcher(201, null, res);
-                }
-            });
-        }
-    };
-
-    /**
-     * Salva alteraçao necessaria no banco e dispacha a requicao
-     */
-    this.dispatchUpdate = function () {
-        var id = req.body._id;
-        delete req.body._id;
-        model.findByIdAndUpdate(id, validate(req.body), {runValidators: true}, function (error, value) {
-            if (error) {
-                processExceptions(new Exception(error), res);
-            } else if (value) {
-                setLocation(req, res, value);
-                dispatcher(200, null, res);
-            } else {
-                dispatcher(404, null, res);
-            }
-        });
-    };
-
-    this.dispatchDeleteById = function () {
-        model.findById(req.params.id, function (error, value) {
-            if (error) {
-                processExceptions(new Exception(error), res);
-            } else if (value) {
-                value.remove(function (error) {
-                    if (error) {
-                        processExceptions(new Exception(error));
-                    } else {
-                        dispatcher(200, null, res);
-                    }
-                });
-            } else {
-                dispatcher(404, null, res);
-            }
-        });
-    };
-
-    /**
-     * trata resposta necessaria relacionada ao envento de countar numero de documentos
-     */
-    this.dispatchCount = function () {
-        filterEngine(model.count(), validate(req.query), function (query) {
-            query.exec(function (error, total) {
-                if (error) {
-                    processExceptions(new InternalErrorException(), res);
-                } else {
-                    res.status(200).send(JSON.stringify(total)).end();
-                }
-            });
-        });
-    };
-};
-module.exports = Zumbi;
-
-/**
- * Processa exceptions para devolver devidos codigos de errors para a requisição
- * @param error -> exception ocorrida
- * @param response -> response do cliente
- */
-var processExceptions = function (error, response) {
-    //devolvendo a mensagem de erro pra requisição
-    response
-        .status(error.getHttpStatus())
-        .send({'error': error.getErrors()})
-        .end();
+var bodyParser = require('body-parser');
+var ZumbiEngine = require('./engine/zumbiCrud');
+var ZumbiModel = require('./zumbiModel');
+var METHOD = {
+    GET: 'get',
+    POST: 'post',
+    PUT: 'put',
+    DELETE: 'delete'
 };
 
-
-/**
- * Valida objetos vindo de requisição para evitar sql injections e coisas do tipo
- * @param model -> modelo a ser validado
- */
-var validate = function (model) {
-    Object.keys(model).forEach(function (key) {
-        if (model[key] instanceof Array) {
-            model[key].forEach(function (key) {
-                return validate(key);
-            });
-        } else {
-            model[key] = validator.trim(validator.escape(model[key]));
-            if (model[key] == '') {
-                //console.log('deletando..');
-                //console.log(model[key]);
-                delete model[key];
-            }
-        }
-    });
-    return model;
-};
-
-/**
- * Processa filtros adivindos de requisições http
- * @param query -> query do mogoose
- * @param parameters -> parametros advindo da requisição
- * @param callbakc -> notifica termino
- */
-var filterEngine = function (query, parameters, callback) {
-    var skip, limit, orderByAsc, orderByDesc, fields;
-
-    //console.log(parameters['orderByAsc']);
-
-    //filtrando conforme os parametros;
-    if (parameters.skip) {
-        query.skip(parameters.skip);
-        delete parameters.skip;
+var ZumbiServer = function (_express, zumbiModel) {
+    var port;
+    var endPoints = new Array;
+    var express;
+    if (!_express) {
+        throw new Error('Plese, express is required');
     } else {
-        query.skip(0);
+        express = _express;
     }
 
-    if (parameters.limit) {
-        query.limit(parameters.limit);
-        delete parameters.limit;
-    } else {
-        query.limit(1000);
-    }
-
-    if (parameters.orderByAsc) {
-        parameters.orderByAsc.split('|').forEach(function (value) {
-            query.sort(createJson(value, 1));
+    /**
+     * Set the port to be listened by the ZumbiServer
+     * @param port -> port for listen
+     */
+    this.port = function (_port) {
+        port = _port;
+        return this;
+    };
+    /**
+     * Sets the zombie model if it is not spent by the constructor
+     * @param _zumbiModel -> zumbiModel
+     */
+    this.model = function (_zumbiModel) {
+        zumbiModel = _zumbiModel;
+    };
+    this.crudOfModel = function () {
+        if (!zumbiModel || !zumbiModel instanceof ZumbiModel)throw new Error('Warning, zumbiModel is null.');
+        this.post(zumbiModel.getEndPoint(), function (req, res) {
+            new ZumbiEngine(req, res, zumbiModel.getModel()).dispatchSave();
         });
-        delete parameters.orderByAsc;
-    }
-
-    if (parameters.orderByDesc) {
-        parameters.orderByDesc.split('|').forEach(function (value) {
-            query.sort(createJson(value, -1));
+        this.put(zumbiModel.getEndPoint(), function (req, res) {
+            new ZumbiEngine(req, res, zumbiModel.getModel()).dispatchFind();
         });
-        delete parameters.orderByDesc;
+
+        this.get(prepareEndPoint(zumbiModel.getEndPoint(), 'count'), function (req, res) {
+            new ZumbiEngine(req, res, zumbiModel.getModel()).dispatchCount();
+        });
+        this.get(prepareEndPoint(zumbiModel.getEndPoint(), ':id'), function (req, res) {
+            new ZumbiEngine(req, res, zumbiModel.getModel()).dispatchFindById(zumbiModel.getResourceSingular());
+        });
+        this.get(zumbiModel.getEndPoint(), function (req, res) {
+            new ZumbiEngine(req, res, zumbiModel.getModel()).dispatchFind(zumbiModel.getResourcePlural());
+        });
+        this.delete(prepareEndPoint(zumbiModel.getEndPoint(), ':id'), function (req, res) {
+            new ZumbiEngine(req, res, zumbiModel.getModel()).dispatchDeleteById();
+        });
+        zumbiModel.getSubEndPoints().forEach(function (subEndPoint) {
+
+        });
+        return this;
+    };
+    /**
+     * Add endpoint with GET method
+     * @param endPoint -> endPoint for method GET
+     * @param endPoint -> path from model for query
+     */
+    this.addGetfindBySubEndPoint = function (endPoint, fieldFielter) {
+        if (!endPoint.contains(':'))throw new Error('Warning, it is necessary to enter a endPoint with a parameter. Example "/people/name/:name" where the parameter ": name" is necessary');
+        index = endPoint.indexOf(':');
+        parameter = endPoint.substr(index, endPoint.length);
+        json = {};
+        this.get(endPoint, function (req, res) {
+            json[fieldFielter] = req.params[parameter.replace(':')];
+            new ZumbiEngine(req, res, zumbiModel.getModel()).dispatchFindByField(json, zumbiModel.getResourcePlural());
+        });
+    };
+
+    /**
+     * Add endpoint with GET method
+     * @param endPoint -> endPoint for method GET
+     * @param endPoint -> route for endPoint
+     */
+    this.get = function (endPoint, router) {
+        endPoints.push({method: METHOD.GET, endPoint: endPoint, router: router});
+        return this;
+    };
+    /**
+     * Add endpoint with POST method
+     * @param endPoint -> endPoint for method POST
+     * @param endPoint -> route for endPoint
+     */
+    this.post = function (endPoint, router) {
+        endPoints.push({method: METHOD.POST, endPoint: endPoint, router: router});
+        return this;
+    };
+    /**
+     * Add endpoint with put method
+     * @param endPoint -> endPoint for method PUT
+     * @param endPoint -> route for endPoint
+     */
+    this.put = function (endPoint, router) {
+        endPoints.push({method: METHOD.PUT, endPoint: endPoint, router: router});
+        return this;
+    };
+    /**
+     * Add endpoint with delete method
+     * @param endPoint -> endPoint for method PUT
+     * @param endPoint -> route for endPoint
+     */
+    this.delete = function (endPoint, router) {
+        endPoints.push({method: METHOD.DELETE, endPoint: endPoint, router: router});
+        return this;
+    };
+    /**
+     * Start Zumbi Server
+     */
+    this.startZumbiServer = function (callBackOnListen) {
+        var server = express.listen(port, function () {
+            console.log('Zumbi Server started on port ' + server.address().port);
+            if (callBackOnListen)callBackOnListen();
+        });
+        express.use(bodyParser.json());
+        express.use(bodyParser.urlencoded({
+            extended: true
+        }));
+        processEndPoints();
+    };
+
+    var processEndPoints = function () {
+        endPoints.forEach(function (endPoint) {
+            switch (endPoint['method']) {
+                case METHOD.GET:
+                    express.get(endPoint['endPoint'], endPoint['router']);
+                    break;
+                case METHOD.POST:
+                    express.post(endPoint['endPoint'], endPoint['router']);
+                    break;
+                case METHOD.PUT:
+                    express.put(endPoint['endPoint'], endPoint['router']);
+                    break;
+                case METHOD.DELETE:
+                    express.delete(endPoint['endPoint'], endPoint['router']);
+                    break;
+                default:
+                    throw new Error('Erro add endpoint -> ', endPoint);
+                    break;
+            }
+            console.log('add [method "%s" endPoint "%s"]', endPoint['method'], endPoint['endPoint']);
+        });
     }
-
-//percorrendo todos os campos passado por paramentro
-    Object.keys(parameters).forEach(function (key) {
-        query.where(key, parameters[key]);
-    });
-    callback(query);
-};
-/**
- * Cria um json lenvando em consideração a chave e valor passado por parametro
- * @param key -> chave do json
- * @param values -> valor presente no json
- */
-var createJson = function (key, values) {
-    //se key é vazio retornamos apenas values
-    if (!key)return values;
-    var json = {};
-    json[key] = values;
-    return json;
 };
 
-/**
- * Adiciona o location no cabeçalho da requisição
- * @param req ->request
- * @param res ->response
- * @param model ->model
- */
-var setLocation = function (req, res, model) {
-    res.location(req.protocol + "://" + req.get('host') + req.originalUrl + '/' + model._id);
-};
-
-/**
- * Dispacha o response
- * @param statusHttp -> status
- * @param body -> coteudo a ser despachado
- * @param res -> response para despacho
- */
-var dispatcher = function (statusHttp, body, res) {
-    res.status(statusHttp);
-    if (body) {
-        res.send(body).end();
-    } else {
-        res.end();
-    }
+module.exports = ZumbiServer;
+var prepareEndPoint = function (singleEndPoint, concat) {
+    return ((singleEndPoint.charAt(singleEndPoint.length - 1)) != '/') ? endpoitCount = singleEndPoint + '/' + concat : endpoitCount = singleEndPoint + concat;
 };

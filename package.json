@@ -2,7 +2,7 @@
   "name": "zumbijs",
   "version": "1.0.0",
   "description": "Framework to assist in the development of web service rest",
-  "main": "app.js",
+  "main": "zumbi.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
   },
@@ -16,7 +16,8 @@
   "author": "Joel Rodrigues Moreira",
   "license": "ISC",
   "dependencies": {
-    "validator": "^4.4.0"
+    "validator": "^4.4.0",
+    "body-parser": "^1.14.2"
   },
   "bugs": {
     "url": "https://github.com/joeldatabox/zumbijs/issues"
