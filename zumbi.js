@@ -1,5 +1,5 @@
 var bodyParser = require('body-parser');
-var ZumbiEngine = require('./engine/zumbiCrud');
+var ZumbiEngine = require('./engine/zumbiEngine');
 var ZumbiModel = require('./zumbiModel');
 var METHOD = {
     GET: 'get',
