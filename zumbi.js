@@ -11,6 +11,7 @@ var METHOD = {
 var ZumbiServer = function (_express, zumbiModel) {
     var port;
     var endPoints = new Array;
+    var useExpress = new Array;
     var express;
     if (!_express) {
         throw new Error('Plese, express is required');
@@ -32,6 +33,9 @@ var ZumbiServer = function (_express, zumbiModel) {
      */
     this.model = function (_zumbiModel) {
         zumbiModel = _zumbiModel;
+    };
+    this.addUsesExpress = function (use) {
+        useExpress.push(use);
     };
     this.crudOfModel = function () {
         if (!zumbiModel || !zumbiModel instanceof ZumbiModel)throw new Error('Warning, zumbiModel is null.');
@@ -118,6 +122,9 @@ var ZumbiServer = function (_express, zumbiModel) {
         var server = express.listen(port, function () {
             console.log('Zumbi Server started on port ' + server.address().port);
             if (callBackOnListen)callBackOnListen();
+        });
+        useExpress.forEach(function (uses) {
+            express.use(uses);
         });
         express.use(bodyParser.json());
         express.use(bodyParser.urlencoded({
