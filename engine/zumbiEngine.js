@@ -1,6 +1,7 @@
 var NotFoundException = require('./../exception/notFoundException');
 var InternalErrorException = require('./../exception/internalErrorException');
 var BadRequestException = require('./../exception/badRequestException');
+var ConflictException = require('./../exception/conflictException');
 var Exception = require('./../exception/exception');
 var validator = require('validator');
 var extend = require('util')._extend;
@@ -78,13 +79,23 @@ var EngineZumbi = function (request, response, model) {
      */
     this.dispatchUpdate = function () {
         var id = req.body._id;
+        //console.log(req.body);
         delete req.body._id;
-        model.findByIdAndUpdate(id, validate(req.body), {runValidators: true}, function (error, value) {
+        model.findById(id, function(error, value){
             if (error) {
-                processExceptions(new Exception(error), res);
+                processExceptions(new NotFoundException(), res);
             } else if (value) {
-                setLocation(req, res, value);
-                dispatcher(200, null, res);
+                model.findByIdAndUpdate(id, validate(req.body), {runValidators: true}, function (error, value) {
+                    if (error) {
+                        processExceptions(new Exception(error), res);
+                    } else if (value) {
+                        console.log(value);
+                        setLocation(req, res, value);
+                        dispatcher(200, null, res);
+                    } else {
+                        dispatcher(404, null, res);
+                    }
+                });
             } else {
                 dispatcher(404, null, res);
             }
@@ -224,6 +235,7 @@ var createJson = function (key, values) {
  * @param model ->model
  */
 var setLocation = function (req, res, model) {
+    var location =
     res.location(req.protocol + "://" + req.get('host') + req.originalUrl + '/' + model._id);
 };
 

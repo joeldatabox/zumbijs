@@ -18,6 +18,8 @@ var ZumbiServer = function (_express, zumbiModel) {
     } else {
         express = _express;
     }
+    if(zumbiModel != null)
+    this.addCrud(zumbiModel);
 
     /**
      * Set the port to be listened by the ZumbiServer
@@ -37,13 +39,14 @@ var ZumbiServer = function (_express, zumbiModel) {
     this.addUsesExpress = function (use) {
         useExpress.push(use);
     };
-    this.crudOfModel = function () {
+
+    this.addCrud = function(zumbiModel){
         if (!zumbiModel || !zumbiModel instanceof ZumbiModel)throw new Error('Warning, zumbiModel is null.');
         this.post(zumbiModel.getEndPoint(), function (req, res) {
             new ZumbiEngine(req, res, zumbiModel.getModel()).dispatchSave();
         });
         this.put(zumbiModel.getEndPoint(), function (req, res) {
-            new ZumbiEngine(req, res, zumbiModel.getModel()).dispatchFind();
+            new ZumbiEngine(req, res, zumbiModel.getModel()).dispatchUpdate();
         });
 
         this.get(prepareEndPoint(zumbiModel.getEndPoint(), 'count'), function (req, res) {
@@ -58,11 +61,10 @@ var ZumbiServer = function (_express, zumbiModel) {
         this.delete(prepareEndPoint(zumbiModel.getEndPoint(), ':id'), function (req, res) {
             new ZumbiEngine(req, res, zumbiModel.getModel()).dispatchDeleteById();
         });
-        zumbiModel.getSubEndPoints().forEach(function (subEndPoint) {
-
-        });
         return this;
     };
+
+
     /**
      * Add endpoint with GET method
      * @param endPoint -> endPoint for method GET
