@@ -79,7 +79,7 @@ var EngineZumbi = function (request, response, model) {
      */
     this.dispatchUpdate = function () {
         var id = req.body._id;
-        console.log(req.body);
+        //console.log(req.body);
         delete req.body._id;
         model.findById(id, function(error, value){
             if (error) {
