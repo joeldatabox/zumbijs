@@ -89,7 +89,7 @@ var EngineZumbi = function (request, response, model) {
                     if (error) {
                         processExceptions(new Exception(error), res);
                     } else if (value) {
-                        console.log(value);
+                        /*console.log(value);*/
                         setLocation(req, res, value);
                         dispatcher(200, null, res);
                     } else {
@@ -125,8 +125,10 @@ var EngineZumbi = function (request, response, model) {
     /**
      * Processes necessary response related to event count
      */
-    this.dispatchCount = function () {
-        filterEngine(model.count(), validate(req.query), function (query) {
+    this.dispatchCount = function (filters) {
+        var parameters ={}
+        filters ? parameters = extend(filters, req.query) : parameters = req.query;
+        filterEngine(model.count(), validate(parameters), function (query) {
             query.exec(function (error, total) {
                 if (error) {
                     processExceptions(new InternalErrorException(), res);
