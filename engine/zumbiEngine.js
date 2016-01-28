@@ -81,7 +81,7 @@ var EngineZumbi = function (request, response, model) {
         var id = req.body._id;
         //console.log(req.body);
         delete req.body._id;
-        model.findById(id, function(error, value){
+        model.findById(id, function (error, value) {
             if (error) {
                 processExceptions(new NotFoundException(), res);
             } else if (value) {
@@ -107,11 +107,15 @@ var EngineZumbi = function (request, response, model) {
     this.dispatchDeleteById = function () {
         model.findById(req.params.id, function (error, value) {
             if (error) {
-                processExceptions(new Exception(error), res);
+                if (error.name == 'CastError' && error.path == '_id') {
+                    processExceptions(new NotFoundException(), res);
+                } else {
+                    processExceptions(new Exception(error), res);
+                }
             } else if (value) {
                 value.remove(function (error) {
                     if (error) {
-                        processExceptions(new Exception(error));
+                        processExceptions(new Exception(error), res);
                     } else {
                         dispatcher(200, null, res);
                     }
@@ -126,7 +130,7 @@ var EngineZumbi = function (request, response, model) {
      * Processes necessary response related to event count
      */
     this.dispatchCount = function (filters) {
-        var parameters ={}
+        var parameters = {}
         filters ? parameters = extend(filters, req.query) : parameters = req.query;
         filterEngine(model.count(), validate(parameters), function (query) {
             query.exec(function (error, total) {
@@ -162,12 +166,17 @@ var processExceptions = function (error, response) {
 var validate = function (model) {
     Object.keys(model).forEach(function (key) {
         if (model[key] instanceof Array) {
-            model[key].forEach(function (key) {
-                return validate(key);
+            model[key].forEach(function (item) {
+                item = validate(item);
             });
+        } else if (model[key] instanceof Object) {
+            validate(model[key]);
         } else {
-            model[key] = validator.trim(validator.escape(model[key]));
-            if (model[key] == '') {
+            if ((model[key] + '').length > 0) {
+                if (!isObjectID(model[key])) {
+                    model[key] = validator.trim(validator.escape(model[key]));
+                }
+            } else {
                 delete model[key];
             }
         }
@@ -237,8 +246,12 @@ var createJson = function (key, values) {
  * @param model ->model
  */
 var setLocation = function (req, res, model) {
+    var originalUrl = req.originalUrl;
+    if(originalUrl.charAt(originalUrl.length -1) != '/'){
+        originalUrl +='/';
+    }
     var location =
-    res.location(req.protocol + "://" + req.get('host') + req.originalUrl + '/' + model._id);
+        res.location(req.protocol + "://" + req.get('host') + originalUrl + model._id);
 };
 
 /**
@@ -254,4 +267,20 @@ var dispatcher = function (statusHttp, body, res) {
     } else {
         res.end();
     }
+};
+
+/**
+ * Checks if a value is a valid bson ObjectId
+ *
+ * @method
+ * @return {boolean} return true if the value is a valid bson ObjectId, return false otherwise.
+ */
+isObjectID = function isValid(id) {
+    if (id == null) return false;
+    if (typeof id == 'number')
+        return true;
+    if (typeof id == 'string') {
+        return id.length == 12 || (id.length == 24 && new RegExp("^[0-9a-fA-F]{24}$").test(id));
+    }
+    return false;
 };

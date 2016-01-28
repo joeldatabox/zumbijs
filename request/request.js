@@ -33,8 +33,8 @@ var Request = function (URI) {
         headers[key] = value;
     };
 
-    this.addAllHeaders = function(json){
-          headers = extend(headers, json);
+    this.addAllHeaders = function (json) {
+        headers = extend(headers, json);
     };
 
     this.accept = function (accept) {
@@ -60,7 +60,9 @@ var Request = function (URI) {
 
     this.buildRequest = function () {
         var json = {};
-        if(Object.keys(body).length >0) json.body = body;
+        if (Object.keys(body).length > 0) {
+            json.body = body;
+        }
         json.url = url;
         json.header = headers;
         return json;

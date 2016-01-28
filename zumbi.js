@@ -1,6 +1,7 @@
 var bodyParser = require('body-parser');
 var ZumbiEngine = require('./engine/zumbiEngine');
 var ZumbiModel = require('./zumbiModel');
+var Post = require('./request/method/post');
 var METHOD = {
     GET: 'get',
     POST: 'post',
@@ -18,8 +19,8 @@ var ZumbiServer = function (_express, zumbiModel) {
     } else {
         express = _express;
     }
-    if(zumbiModel != null)
-    this.addCrud(zumbiModel);
+    if (zumbiModel != null)
+        this.addCrud(zumbiModel);
 
     /**
      * Set the port to be listened by the ZumbiServer
@@ -40,7 +41,10 @@ var ZumbiServer = function (_express, zumbiModel) {
         useExpress.push(use);
     };
 
-    this.addCrud = function(zumbiModel){
+    /**
+     * Add crud of zumbiModel
+     */
+    this.addCrud = function (zumbiModel) {
         if (!zumbiModel || !zumbiModel instanceof ZumbiModel)throw new Error('Warning, zumbiModel is null.');
         this.post(zumbiModel.getEndPoint(), function (req, res) {
             new ZumbiEngine(req, res, zumbiModel.getModel()).dispatchSave();
@@ -119,6 +123,7 @@ var ZumbiServer = function (_express, zumbiModel) {
     };
     /**
      * Start Zumbi Server
+     * @param callBackOnListen ->listen envents of express
      */
     this.startZumbiServer = function (callBackOnListen) {
         var server = express.listen(port, function () {
@@ -133,6 +138,12 @@ var ZumbiServer = function (_express, zumbiModel) {
             extended: true
         }));
         processEndPoints();
+        /*if(autoRegister){
+         new Post(autoRegister)
+         .path('/registerMicroservices')
+         .send(endPoints)
+         .exec();
+         }*/
     };
 
     var processEndPoints = function () {
@@ -155,6 +166,9 @@ var ZumbiServer = function (_express, zumbiModel) {
                     break;
             }
             console.log('add [method "%s" endPoint "%s"]', endPoint['method'], endPoint['endPoint']);
+        });
+        express.options('/', function (req, res) {
+            res.send({'Zumbi-Methods': endPoints});
         });
     }
 };
