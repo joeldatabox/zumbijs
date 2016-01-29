@@ -123,9 +123,10 @@ var ZumbiServer = function (_express, zumbiModel) {
     };
     /**
      * Start Zumbi Server
+     * @param prefix -> prefix of all endpoints
      * @param callBackOnListen ->listen envents of express
      */
-    this.startZumbiServer = function (callBackOnListen) {
+    this.startZumbiServer = function (prefix, callBackOnListen) {
         var server = express.listen(port, function () {
             console.log('Zumbi Server started on port ' + server.address().port);
             if (callBackOnListen)callBackOnListen();
@@ -137,7 +138,7 @@ var ZumbiServer = function (_express, zumbiModel) {
         express.use(bodyParser.urlencoded({
             extended: true
         }));
-        processEndPoints();
+        processEndPoints(prefix);
         /*if(autoRegister){
          new Post(autoRegister)
          .path('/registerMicroservices')
@@ -146,26 +147,26 @@ var ZumbiServer = function (_express, zumbiModel) {
          }*/
     };
 
-    var processEndPoints = function () {
+    var processEndPoints = function (prefix) {
         endPoints.forEach(function (endPoint) {
             switch (endPoint['method']) {
                 case METHOD.GET:
-                    express.get(endPoint['endPoint'], endPoint['router']);
+                    express.get(prepareEndPoint(prefix, endPoint['endPoint']), endPoint['router']);
                     break;
                 case METHOD.POST:
-                    express.post(endPoint['endPoint'], endPoint['router']);
+                    express.post(prepareEndPoint(prefix, endPoint['endPoint']), endPoint['router']);
                     break;
                 case METHOD.PUT:
-                    express.put(endPoint['endPoint'], endPoint['router']);
+                    express.put(prepareEndPoint(prefix, endPoint['endPoint']), endPoint['router']);
                     break;
                 case METHOD.DELETE:
-                    express.delete(endPoint['endPoint'], endPoint['router']);
+                    express.delete(prepareEndPoint(prefix, endPoint['endPoint']), endPoint['router']);
                     break;
                 default:
                     throw new Error('Erro add endpoint -> ', endPoint);
                     break;
             }
-            console.log('add [method "%s" endPoint "%s"]', endPoint['method'], endPoint['endPoint']);
+            console.log('add [method "%s" endPoint "%s"]', endPoint['method'], prepareEndPoint(prefix, endPoint['endPoint']));
         });
         express.options('/', function (req, res) {
             res.send({'Zumbi-Methods': endPoints});
@@ -175,5 +176,19 @@ var ZumbiServer = function (_express, zumbiModel) {
 
 module.exports = ZumbiServer;
 var prepareEndPoint = function (singleEndPoint, concat) {
-    return ((singleEndPoint.charAt(singleEndPoint.length - 1)) != '/') ? endpoitCount = singleEndPoint + '/' + concat : endpoitCount = singleEndPoint + concat;
+    if (singleEndPoint == null)singleEndPoint = '';
+    if (singleEndPoint.charAt(0) != '/') {
+        singleEndPoint = '/' + singleEndPoint;
+    }
+    if (singleEndPoint.charAt(singleEndPoint.length - 1) != '/') {
+        singleEndPoint += '/';
+    }
+
+    if (concat.charAt(0) != '/') {
+        concat = '/' + concat;
+    }
+    if (concat.charAt(concat.length - 1) != '/') {
+        concat += '/';
+    }
+    return (singleEndPoint + concat).replace('//', '/');
 };
