@@ -54,7 +54,7 @@ var Get = function (uri) {
         //exec request
         this.exec(function (err, _res) {
             if (err) {
-                if (err.code == 'ECONNREFUSED' || err.errno == 'ECONNREFUSED') {
+                if (err.code == 'ECONNREFUSED' || err.errno == 'ECONNREFUSED' || err.code =='ECONNRESET' || err.errno =='ECONNRESET') {
                     res.statusCode = 503;
                     res.send({error:{message:'error on request service'}}).end();
                 } else {
