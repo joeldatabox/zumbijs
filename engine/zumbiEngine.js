@@ -193,14 +193,14 @@ var validate = function (model) {
 var filterEngine = function (query, parameters, callback) {
     var skip, limit, orderByAsc, orderByDesc, fields;
     if (parameters.skip) {
-        query.skip(parameters.skip);
+        query.skip(Number(parameters.skip));
         delete parameters.skip;
     } else {
         query.skip(0);
     }
 
     if (parameters.limit) {
-        query.limit(parameters.limit);
+        query.limit(Number(parameters.limit));
         delete parameters.limit;
     } else {
         query.limit(1000);
