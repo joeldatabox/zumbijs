@@ -1,7 +1,9 @@
+var express;
 var bodyParser = require('body-parser');
 var ZumbiEngine = require('./engine/zumbiEngine');
 var ZumbiModel = require('./zumbiModel');
 var Post = require('./request/method/post');
+var Router;
 var METHOD = {
     GET: 'get',
     POST: 'post',
@@ -9,19 +11,18 @@ var METHOD = {
     DELETE: 'delete'
 };
 
-var ZumbiServer = function (_express, zumbiModel) {
+var ZumbiServer = function (zumbiModel) {
+    express = require('express');
     var port;
     var endPoints = new Array;
     var useExpress = new Array;
     var express;
-    if (!_express) {
-        throw new Error('Plese, express is required');
-    } else {
-        express = _express;
-    }
+
+
     if (zumbiModel != null)
         this.addCrud(zumbiModel);
 
+    Router = express.Router();
     /**
      * Set the port to be listened by the ZumbiServer
      * @param port -> port for listen
@@ -90,8 +91,17 @@ var ZumbiServer = function (_express, zumbiModel) {
      * @param endPoint -> endPoint for method GET
      * @param endPoint -> route for endPoint
      */
-    this.get = function (endPoint, router) {
-        endPoints.push({method: METHOD.GET, endPoint: endPoint, router: router});
+    this.get = function (endPoint, callback) {
+        /*var router = express.Router();
+         if (arguments.length > 2) {
+         //começamos no indice 1 pois não se pode pegar o parametro endPoint e sim pegar todos os callbacks
+         for (i = 1; i < arguments.length; i++) {
+         router.route(endPoint).get(arguments[i]);
+         }
+         }else{
+         router.route(endPoint).get(callback);
+         }*/
+        endPoints.push(proccessMethods('get', arguments));
         return this;
     };
     /**
@@ -100,7 +110,8 @@ var ZumbiServer = function (_express, zumbiModel) {
      * @param endPoint -> route for endPoint
      */
     this.post = function (endPoint, router) {
-        endPoints.push({method: METHOD.POST, endPoint: endPoint, router: router});
+        /*endPoints.push({method: METHOD.POST, endPoint: endPoint, router: router});*/
+        endPoints.push(proccessMethods('post', arguments));
         return this;
     };
     /**
@@ -109,7 +120,8 @@ var ZumbiServer = function (_express, zumbiModel) {
      * @param endPoint -> route for endPoint
      */
     this.put = function (endPoint, router) {
-        endPoints.push({method: METHOD.PUT, endPoint: endPoint, router: router});
+        /*endPoints.push({method: METHOD.PUT, endPoint: endPoint, router: router});*/
+        endPoints.push(proccessMethods('put', arguments));
         return this;
     };
     /**
@@ -118,7 +130,9 @@ var ZumbiServer = function (_express, zumbiModel) {
      * @param endPoint -> route for endPoint
      */
     this.delete = function (endPoint, router) {
-        endPoints.push({method: METHOD.DELETE, endPoint: endPoint, router: router});
+
+        /*endPoints.push({method: METHOD.DELETE, endPoint: endPoint, router: router});*/
+        endPoints.push(proccessMethods('delete', arguments));
         return this;
     };
     /**
@@ -127,15 +141,16 @@ var ZumbiServer = function (_express, zumbiModel) {
      * @param callBackOnListen ->listen envents of express
      */
     this.startZumbiServer = function (prefix, callBackOnListen) {
-        var server = express.listen(port, function () {
+        var app = express();
+        var server = app.listen(port, function () {
             console.log('Zumbi Server started on port ' + server.address().port);
             if (callBackOnListen)callBackOnListen();
         });
         useExpress.forEach(function (uses) {
-            express.use(uses);
+            app.use(uses);
         });
-        express.use(bodyParser.json());
-        express.use(bodyParser.urlencoded({
+        app.use(bodyParser.json());
+        app.use(bodyParser.urlencoded({
             extended: true
         }));
         processEndPoints(prefix);
@@ -149,7 +164,8 @@ var ZumbiServer = function (_express, zumbiModel) {
 
     var processEndPoints = function (prefix) {
         endPoints.forEach(function (endPoint) {
-            switch (endPoint['method']) {
+            express.use(prefix, endPoint);
+            /*switch (endPoint['method']) {
                 case METHOD.GET:
                     express.get(prepareEndPoint(prefix, endPoint['endPoint']), endPoint['router']);
                     break;
@@ -166,7 +182,7 @@ var ZumbiServer = function (_express, zumbiModel) {
                     throw new Error('Erro add endpoint -> ', endPoint);
                     break;
             }
-            console.log('add [method "%s" endPoint "%s"]', endPoint['method'], prepareEndPoint(prefix, endPoint['endPoint']));
+            console.log('add [method "%s" endPoint "%s"]', endPoint['method'], prepareEndPoint(prefix, endPoint['endPoint']));*/
         });
         express.options('/', function (req, res) {
             res.send({'Zumbi-Methods': endPoints});
@@ -191,4 +207,17 @@ var prepareEndPoint = function (singleEndPoint, concat) {
         concat += '/';
     }
     return (singleEndPoint + concat).replace('//', '/');
+};
+
+var proccessMethods = function (method, parameters) {
+    var route = Router.route(parameters[0]);
+    if (parameters.length > 2) {
+        //começamos no indice 1 pois não se pode pegar o parametro endPoint e sim pegar todos os callbacks
+        for (i = 1; i < parameters.length; i++) {
+            route[method](arguments[i]);
+        }
+    } else {
+        route[method](parameters[1]);
+    }
+    return route;
 };
