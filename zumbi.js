@@ -1,9 +1,10 @@
-var express;
+var express = require('express');
 var bodyParser = require('body-parser');
 var ZumbiEngine = require('./engine/zumbiEngine');
 var ZumbiModel = require('./zumbiModel');
 var Post = require('./request/method/post');
-var Router;
+var Router = require('./router/router');
+var morgan = require('morgan');
 var METHOD = {
     GET: 'get',
     POST: 'post',
@@ -12,17 +13,23 @@ var METHOD = {
 };
 
 var ZumbiServer = function (zumbiModel) {
-    express = require('express');
+
     var port;
     var endPoints = new Array;
     var useExpress = new Array;
-    var express;
+    var log;
 
 
     if (zumbiModel != null)
         this.addCrud(zumbiModel);
 
-    Router = express.Router();
+    /**
+     * Enable ou disable the log to console
+     * @param value -> a boolean
+     */
+    this.showLog = function(value){
+        log = value;
+    };
     /**
      * Set the port to be listened by the ZumbiServer
      * @param port -> port for listen
@@ -92,16 +99,10 @@ var ZumbiServer = function (zumbiModel) {
      * @param endPoint -> route for endPoint
      */
     this.get = function (endPoint, callback) {
-        /*var router = express.Router();
-         if (arguments.length > 2) {
-         //começamos no indice 1 pois não se pode pegar o parametro endPoint e sim pegar todos os callbacks
-         for (i = 1; i < arguments.length; i++) {
-         router.route(endPoint).get(arguments[i]);
-         }
-         }else{
-         router.route(endPoint).get(callback);
-         }*/
-        endPoints.push(proccessMethods('get', arguments));
+        var router = new Router(prepareEndPoint(endPoint),express.Router());
+        var args = prepareArguments(arguments).slice(1, arguments.length);
+        router.get(args);
+        endPoints.push({method: METHOD.GET, endPoint: endPoint, routers: router});
         return this;
     };
     /**
@@ -109,9 +110,11 @@ var ZumbiServer = function (zumbiModel) {
      * @param endPoint -> endPoint for method POST
      * @param endPoint -> route for endPoint
      */
-    this.post = function (endPoint, router) {
-        /*endPoints.push({method: METHOD.POST, endPoint: endPoint, router: router});*/
-        endPoints.push(proccessMethods('post', arguments));
+    this.post = function (endPoint, callback) {
+        var router = new Router(prepareEndPoint(endPoint),express.Router());
+        var args = prepareArguments(arguments).slice(1, arguments.length);
+        router.post(args);
+        endPoints.push({method: METHOD.POST, endPoint: endPoint, routers: router});
         return this;
     };
     /**
@@ -119,9 +122,11 @@ var ZumbiServer = function (zumbiModel) {
      * @param endPoint -> endPoint for method PUT
      * @param endPoint -> route for endPoint
      */
-    this.put = function (endPoint, router) {
-        /*endPoints.push({method: METHOD.PUT, endPoint: endPoint, router: router});*/
-        endPoints.push(proccessMethods('put', arguments));
+    this.put = function (endPoint, callback) {
+        var router = new Router(prepareEndPoint(endPoint),express.Router());
+        var args = prepareArguments(arguments).slice(1, arguments.length);
+        router.put(args);
+        endPoints.push({method: METHOD.PUT, endPoint: endPoint, routers: router});
         return this;
     };
     /**
@@ -129,10 +134,11 @@ var ZumbiServer = function (zumbiModel) {
      * @param endPoint -> endPoint for method PUT
      * @param endPoint -> route for endPoint
      */
-    this.delete = function (endPoint, router) {
-
-        /*endPoints.push({method: METHOD.DELETE, endPoint: endPoint, router: router});*/
-        endPoints.push(proccessMethods('delete', arguments));
+    this.delete = function (endPoint, callback) {
+        var router = new Router(prepareEndPoint(endPoint),express.Router());
+        var args = prepareArguments(arguments).slice(1, arguments.length);
+        router.delete(args);
+        endPoints.push({method: METHOD.DELETE, endPoint: endPoint, routers: router});
         return this;
     };
     /**
@@ -153,41 +159,20 @@ var ZumbiServer = function (zumbiModel) {
         app.use(bodyParser.urlencoded({
             extended: true
         }));
-        processEndPoints(prefix);
-        /*if(autoRegister){
-         new Post(autoRegister)
-         .path('/registerMicroservices')
-         .send(endPoints)
-         .exec();
-         }*/
-    };
+        if(log){
+            app.use(morgan('dev'));
+        }
+        for(i =0; i< endPoints.length; i++){
+            app.use(prepareEndPoint(prefix), endPoints[i].routers.getRouter());
+            console.log('add method [%s->"%s"]', endPoints[i]['method'], prepareEndPoint(prefix, endPoints[i]['endPoint']));
+        }
 
-    var processEndPoints = function (prefix) {
-        endPoints.forEach(function (endPoint) {
-            express.use(prefix, endPoint);
-            /*switch (endPoint['method']) {
-                case METHOD.GET:
-                    express.get(prepareEndPoint(prefix, endPoint['endPoint']), endPoint['router']);
-                    break;
-                case METHOD.POST:
-                    express.post(prepareEndPoint(prefix, endPoint['endPoint']), endPoint['router']);
-                    break;
-                case METHOD.PUT:
-                    express.put(prepareEndPoint(prefix, endPoint['endPoint']), endPoint['router']);
-                    break;
-                case METHOD.DELETE:
-                    express.delete(prepareEndPoint(prefix, endPoint['endPoint']), endPoint['router']);
-                    break;
-                default:
-                    throw new Error('Erro add endpoint -> ', endPoint);
-                    break;
-            }
-            console.log('add [method "%s" endPoint "%s"]', endPoint['method'], prepareEndPoint(prefix, endPoint['endPoint']));*/
-        });
-        express.options('/', function (req, res) {
+        app.options('/', function (req, res) {
             res.send({'Zumbi-Methods': endPoints});
         });
-    }
+    };
+
+
 };
 
 module.exports = ZumbiServer;
@@ -200,24 +185,25 @@ var prepareEndPoint = function (singleEndPoint, concat) {
         singleEndPoint += '/';
     }
 
+    if(concat == null)concat = '';
     if (concat.charAt(0) != '/') {
         concat = '/' + concat;
     }
     if (concat.charAt(concat.length - 1) != '/') {
         concat += '/';
     }
-    return (singleEndPoint + concat).replace('//', '/');
+    var result  = (singleEndPoint + concat).replace('//', '/');
+    return result.substring(0,result.length -1);
 };
 
-var proccessMethods = function (method, parameters) {
-    var route = Router.route(parameters[0]);
-    if (parameters.length > 2) {
-        //começamos no indice 1 pois não se pode pegar o parametro endPoint e sim pegar todos os callbacks
-        for (i = 1; i < parameters.length; i++) {
-            route[method](arguments[i]);
-        }
-    } else {
-        route[method](parameters[1]);
+/**
+ * Prepare  n arguments recepted for parameter
+ * @param _arguments -> list of arguments
+ */
+var prepareArguments = function (_arguments) {
+    var result = new Array();
+    for (var i = 0; i < _arguments.length; i++) {
+        result.push(_arguments[i]);
     }
-    return route;
+    return result;
 };

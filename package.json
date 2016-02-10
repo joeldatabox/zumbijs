@@ -18,8 +18,9 @@
   "dependencies": {
     "body-parser": "^1.14.2",
     "express": "^4.13.4",
+    "morgan": "^1.6.1",
     "superagent": "^1.6.1",
-    "validator": "^4.4.0"
+    "validatorcd": "^4.4.0"
   },
   "bugs": {
     "url": "https://github.com/joeldatabox/zumbijs/issues"
