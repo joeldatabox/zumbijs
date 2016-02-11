@@ -29,6 +29,7 @@ var ZumbiServer = function (zumbiModel) {
      */
     this.showLog = function(value){
         log = value;
+        return this;
     };
     /**
      * Set the port to be listened by the ZumbiServer
