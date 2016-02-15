@@ -45,7 +45,13 @@ var EngineZumbi = function (request, response, model) {
                 if (error) {
                     processExceptions(new NotFoundException(), res);
                 } else if (values) {
-                    dispatcher(200, createJson(key, values), res);
+                    if (values.length > 0) {
+                        //content registers
+                        dispatcher(200, createJson(key, values), res);
+                    } else {
+                        //nocontent registers
+                        dispatcher(204, null, res);
+                    }
                 } else {
                     dispatcher(404, null, res);
                 }
@@ -247,8 +253,8 @@ var createJson = function (key, values) {
  */
 var setLocation = function (req, res, model) {
     var originalUrl = req.originalUrl;
-    if(originalUrl.charAt(originalUrl.length -1) != '/'){
-        originalUrl +='/';
+    if (originalUrl.charAt(originalUrl.length - 1) != '/') {
+        originalUrl += '/';
     }
     var location =
         res.location(req.protocol + "://" + req.get('host') + originalUrl + model._id);
