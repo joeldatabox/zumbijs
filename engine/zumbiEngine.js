@@ -36,8 +36,9 @@ var EngineZumbi = function (request, response, model) {
      * Processes necessary response related to search for feature event filtering a field
      * @param fieldFilter -> field to filter
      * @param key -> key for return to json
+     * @param callback -> callback
      */
-    this.dispatchFindByField = function (fieldFilter, key) {
+    this.dispatchFindByField = function (fieldFilter, key, callback) {
         var parameter = {};
         fieldFilter ? parameter = extend(fieldFilter, req.query) : parameter = req.query;
         filterEngine(model.find(), validate(parameter), function (query) {
@@ -45,6 +46,11 @@ var EngineZumbi = function (request, response, model) {
                 if (error) {
                     processExceptions(new NotFoundException(), res);
                 } else if (values) {
+                    if (callback) {
+                        callback(values, function (_values) {
+                            values = _values;
+                        });
+                    }
                     if (values.length > 0) {
                         //content registers
                         dispatcher(200, createJson(key, values), res);
@@ -197,7 +203,7 @@ var validate = function (model) {
  * @param callbakc -> notifications
  */
 var filterEngine = function (query, parameters, callback) {
-    var skip, limit, orderByAsc, orderByDesc, fields;
+    var skip, limit, orderByAsc, orderByDesc, fields, between, select;
     if (parameters.skip) {
         query.skip(Number(parameters.skip));
         delete parameters.skip;
@@ -224,6 +230,20 @@ var filterEngine = function (query, parameters, callback) {
             query.sort(createJson(value, -1));
         });
         delete parameters.orderByDesc;
+    }
+
+    if (parameters.between && parameters.gte && parameters.lt) {
+        query.where(parameters.between, {$gte: parameters.gte, $lt: parameters.lt});
+        delete parameters.between;
+        delete parameters.gte;
+        delete parameters.lt;
+    }
+
+    if (parameters.select) {
+        parameters.select.split('|').forEach(function (value) {
+            query.select(createJson(value, 1));
+        });
+        delete parameters.select;
     }
 
 //percorrendo todos os campos passado por paramentro

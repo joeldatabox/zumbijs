@@ -5,6 +5,8 @@ var ZumbiModel = require('./zumbiModel');
 var Post = require('./request/method/post');
 var Router = require('./router/router');
 var morgan = require('morgan');
+var underscore = require('underscore');
+
 var METHOD = {
     GET: 'get',
     POST: 'post',
@@ -27,7 +29,7 @@ var ZumbiServer = function (zumbiModel) {
      * Enable ou disable the log to console
      * @param value -> a boolean
      */
-    this.showLog = function(value){
+    this.showLog = function (value) {
         log = value;
         return this;
     };
@@ -100,10 +102,15 @@ var ZumbiServer = function (zumbiModel) {
      * @param endPoint -> route for endPoint
      */
     this.get = function (endPoint, callback) {
-        var router = new Router(prepareEndPoint(endPoint),express.Router());
+        var router = new Router(prepareEndPoint(endPoint), express.Router());
         var args = prepareArguments(arguments).slice(1, arguments.length);
         router.get(args);
-        endPoints.push({method: METHOD.GET, endPoint: endPoint, routers: router});
+        endPoints.push({
+            method: METHOD.GET,
+            endPoint: endPoint,
+            routers: router,
+            weigth: checkWeight(METHOD.GET, endPoint)
+        });
         return this;
     };
     /**
@@ -112,10 +119,15 @@ var ZumbiServer = function (zumbiModel) {
      * @param endPoint -> route for endPoint
      */
     this.post = function (endPoint, callback) {
-        var router = new Router(prepareEndPoint(endPoint),express.Router());
+        var router = new Router(prepareEndPoint(endPoint), express.Router());
         var args = prepareArguments(arguments).slice(1, arguments.length);
         router.post(args);
-        endPoints.push({method: METHOD.POST, endPoint: endPoint, routers: router});
+        endPoints.push({
+            method: METHOD.POST,
+            endPoint: endPoint,
+            routers: router,
+            weigth: checkWeight(METHOD.POST, endPoint)
+        });
         return this;
     };
     /**
@@ -124,10 +136,15 @@ var ZumbiServer = function (zumbiModel) {
      * @param endPoint -> route for endPoint
      */
     this.put = function (endPoint, callback) {
-        var router = new Router(prepareEndPoint(endPoint),express.Router());
+        var router = new Router(prepareEndPoint(endPoint), express.Router());
         var args = prepareArguments(arguments).slice(1, arguments.length);
         router.put(args);
-        endPoints.push({method: METHOD.PUT, endPoint: endPoint, routers: router});
+        endPoints.push({
+            method: METHOD.PUT,
+            endPoint: endPoint,
+            routers: router,
+            weigth: checkWeight(METHOD.PUT, endPoint)
+        });
         return this;
     };
     /**
@@ -136,10 +153,15 @@ var ZumbiServer = function (zumbiModel) {
      * @param endPoint -> route for endPoint
      */
     this.delete = function (endPoint, callback) {
-        var router = new Router(prepareEndPoint(endPoint),express.Router());
+        var router = new Router(prepareEndPoint(endPoint), express.Router());
         var args = prepareArguments(arguments).slice(1, arguments.length);
         router.delete(args);
-        endPoints.push({method: METHOD.DELETE, endPoint: endPoint, routers: router});
+        endPoints.push({
+            method: METHOD.DELETE,
+            endPoint: endPoint,
+            routers: router,
+            weigth: checkWeight(METHOD.DELETE, endPoint)
+        });
         return this;
     };
     /**
@@ -160,10 +182,11 @@ var ZumbiServer = function (zumbiModel) {
         app.use(bodyParser.urlencoded({
             extended: true
         }));
-        if(log){
+        if (log) {
             app.use(morgan('dev'));
         }
-        for(i =0; i< endPoints.length; i++){
+        endPoints = underscore.sortBy(endPoints, 'weigth');
+        for (i = 0; i < endPoints.length; i++) {
             app.use(prepareEndPoint(prefix), endPoints[i].routers.getRouter());
             console.log('add method [%s->"%s"]', endPoints[i]['method'], prepareEndPoint(prefix, endPoints[i]['endPoint']));
         }
@@ -186,15 +209,15 @@ var prepareEndPoint = function (singleEndPoint, concat) {
         singleEndPoint += '/';
     }
 
-    if(concat == null)concat = '';
+    if (concat == null)concat = '';
     if (concat.charAt(0) != '/') {
         concat = '/' + concat;
     }
     if (concat.charAt(concat.length - 1) != '/') {
         concat += '/';
     }
-    var result  = (singleEndPoint + concat).replace('//', '/');
-    return result.substring(0,result.length -1);
+    var result = (singleEndPoint + concat).replace('//', '/');
+    return result.substring(0, result.length - 1);
 };
 
 /**
@@ -207,4 +230,19 @@ var prepareArguments = function (_arguments) {
         result.push(_arguments[i]);
     }
     return result;
+};
+
+var checkWeight = function (method, endpoits) {
+    var index = 0;
+    var weight = 0;
+    var arr = endpoits.split('/');
+    for (var i = 0; i < arr.length; i++) {
+        if(endpoits.includes(':')){
+            var aux = endpoits.split(':').length;
+            weight += (i ^ aux)+aux + i
+        }else{
+            weight +=i+1;
+        }
+    }
+    return weight;
 };
