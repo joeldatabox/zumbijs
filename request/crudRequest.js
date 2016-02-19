@@ -75,6 +75,7 @@ var Crud = function (zumbi, host, path) {
             .get(path, 'count')
             .put(path)
             .delete(path, ':id')
+        return this;
     };
 };
 
