@@ -49,14 +49,22 @@ var EngineZumbi = function (request, response, model) {
                     if (callback) {
                         callback(values, function (_values) {
                             values = _values;
+                            if (values.length > 0) {
+                                //content registers
+                                dispatcher(200, createJson(key, values), res);
+                            } else {
+                                //nocontent registers
+                                dispatcher(204, null, res);
+                            }
                         });
-                    }
-                    if (values.length > 0) {
-                        //content registers
-                        dispatcher(200, createJson(key, values), res);
                     } else {
-                        //nocontent registers
-                        dispatcher(204, null, res);
+                        if (values.length > 0) {
+                            //content registers
+                            dispatcher(200, createJson(key, values), res);
+                        } else {
+                            //nocontent registers
+                            dispatcher(204, null, res);
+                        }
                     }
                 } else {
                     dispatcher(404, null, res);
@@ -154,6 +162,34 @@ var EngineZumbi = function (request, response, model) {
             });
         });
     };
+
+    /**
+     * Http request processing filters
+     * @param filters -> parameters of request
+     * @param callbakc -> notifications
+     */
+    this.filterEngine = function (filter, callback) {
+        var parameter;
+        filter ? parameter = extend(filter, req.query) : parameter = req.query;
+        filterEngine(model.find(), validate(parameter), callback);
+    };
+
+    /**
+     * Dispacher the response
+     * @param statusHttp -> status
+     * @param body -> content for dispath
+     * @param res -> response for dispath
+     */
+    this.dispatch = function (statusHttp, body) {
+        dispatcher(statusHttp, body, res);
+    };
+    /**
+     * Processes exceptions for requests
+     * @param error -> exception occurred
+     */
+    this.exception = function (error) {
+        processExceptions(error, res);
+    }
 };
 module.exports = EngineZumbi;
 
@@ -233,7 +269,7 @@ var filterEngine = function (query, parameters, callback) {
     }
 
     if (parameters.between && parameters.gte && parameters.lt) {
-        query.where(parameters.between, {$gte: parameters.gte, $lt: parameters.lt});
+        query.where(parameters.between, {'$gte': parameters.gte, '$lt': parameters.lt});
         delete parameters.between;
         delete parameters.gte;
         delete parameters.lt;
