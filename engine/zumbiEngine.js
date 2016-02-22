@@ -18,7 +18,7 @@ var EngineZumbi = function (request, response, model) {
             if (error) {
                 processExceptions(new NotFoundException(), res);
             } else if (value) {
-                dispatcher(200, createJson(key, value), res);
+                dispatcher(200, createJson(key, toObject(value)), res);
             } else {
                 dispatcher(404, null, res);
             }
@@ -51,7 +51,7 @@ var EngineZumbi = function (request, response, model) {
                             values = _values;
                             if (values.length > 0) {
                                 //content registers
-                                dispatcher(200, createJson(key, values), res);
+                                dispatcher(200, createJson(key, toObject(values)), res);
                             } else {
                                 //nocontent registers
                                 dispatcher(204, null, res);
@@ -60,7 +60,7 @@ var EngineZumbi = function (request, response, model) {
                     } else {
                         if (values.length > 0) {
                             //content registers
-                            dispatcher(200, createJson(key, values), res);
+                            dispatcher(200, createJson(key, toObject(values)), res);
                         } else {
                             //nocontent registers
                             dispatcher(204, null, res);
@@ -294,6 +294,7 @@ var filterEngine = function (query, parameters, callback) {
  * @param values -> value present in the json
  */
 var createJson = function (key, values) {
+
     //if the key is empty, return single value
     if (!key)return values;
     var json = {};
@@ -346,3 +347,23 @@ isObjectID = function isValid(id) {
     }
     return false;
 };
+
+/**
+ * Checks if model contains method[toObject] for transformation in json object
+ * @param values -> Array of models or single model the mongoose
+ */
+function toObject(values) {
+    if (values instanceof Array) {
+        return values.map(function (item) {
+            if (typeof(item.toObject) === typeof (Function)) {
+                return item.toObject();
+            }
+            return item;
+        });
+    } else {
+        if (typeof(values.toObject) === typeof (Function)) {
+            return values.toObject();
+        }
+        return values;
+    }
+}
