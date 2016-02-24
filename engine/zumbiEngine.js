@@ -44,7 +44,7 @@ var EngineZumbi = function (request, response, model) {
         filterEngine(model.find(), validate(parameter), function (query) {
             query.exec(function (error, values) {
                 if (error) {
-                    processExceptions(new NotFoundException(), res);
+                    processExceptions(new NotFoundException(error), res);
                 } else if (values) {
                     if (callback) {
                         callback(values, function (_values) {
@@ -67,7 +67,7 @@ var EngineZumbi = function (request, response, model) {
                         }
                     }
                 } else {
-                    dispatcher(404, null, res);
+                    dispatcher(204, null, res);
                 }
             });
         });

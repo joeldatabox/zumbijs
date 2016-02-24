@@ -3,19 +3,25 @@ function NotFoundException(title, message) {
     var messageError = 'Not found';
     var httpStatus = 404;
 
-    if(title){
+    if (title && title.name == 'CastError') {
+        httpStatus = 204;
+        //fieldError = error.path;
+        //messageError = ({message: 'error cast \'' + error.value+'\'', campo:fieldError});
+    }
+
+    if (title) {
         titleException = title;
     }
-    if(message){
+    if (message) {
         messageException = message;
     }
-    this.getTitle = function(){
+    this.getTitle = function () {
         return titleException;
     };
-    this.getErrors = function(){
+    this.getErrors = function () {
         return messageError;
     };
-    this.getHttpStatus = function(){
+    this.getHttpStatus = function () {
         return httpStatus;
     };
 };
